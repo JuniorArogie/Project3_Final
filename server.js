@@ -2,6 +2,7 @@ const express = require('express');
 const request = require('request');
 //const fs = require('fs');
 const hbs = require('hbs');
+const bodyParser = require('body-parser')
 //const promisedHandlebars = require('promised-handlebars');
 
 const  port = process.env.PORT || 8080;
@@ -22,6 +23,7 @@ hbs.registerHelper('message', (text) => {
     return text.toUpperCase();
 });
 
+app.use(bodyParser.urlencoded({ extended: true }));
 
 /*
 app.use((request, response, next) => {
@@ -31,17 +33,6 @@ app.use((request, response, next) => {
 });
 */
 
-/*app.use((request, response, next) => {
-    var time = new Date().toString();
-    //console.log(`${time}: ${request.method} ${request.url}`);
-    var log = `${time}: ${request.method} ${request.url}`;
-    fs.appendFile('server.log', log + '\n', (error) => {
-        if (error){
-            console.log('Unable to log message');
-        }
-    });
-    next();
-});*/
 
 app.get('/', (request, response) => {
     response.render('home.hbs', {
@@ -52,62 +43,56 @@ app.get('/', (request, response) => {
     });
 });
 
-app.get('/index', (request, response) => {
-    response.render('index.hbs', {
-        title: 'Index Page',
-        welcome: 'Hello!',
-        head: 'Welcome Home'
 
-    });
-});
-
-var getCode = () => {
+var getPhoto = (photo) => {
     return new Promise((resolve, reject) => {
         request({
-            url: `https://restcountries.eu/rest/v2/name/Canada?fullText=true`,
-            json: true
-        }, (error,response,body) => {
-            if (body.status != 404){
-                resolve(body[0].currencies[0].code);
-            }else{
-                reject(`Can not locate currency`)
-            }
-        });
-    });
-};
-
-var getRate = (code) => {
-    return new Promise((resolve, reject) => {
-        request({
-            url: `https://api.exchangeratesapi.io/latest?symbols=${code}&base=USD`,
+            url: `https://images-api.nasa.gov/search?q=${photo}`,
             json: true
         }, (error,response,body) => {
             if (body.error){
                 reject('Can not convert to USD');
             }else if (body){
-                resolve({rate: body.rates[code]}
+                resolve({link: body.collection.items[0].links[0].href, type: body.collection.metadata.total_hits}
                 )
             }
         });
     });
 };
 
-var exchange = "";
 
-app.get('/currency', (request, response) => {
+app.post('/index', function(request, response) {
+    var photo = request.body.photo;
 
-    getCode().then((result) => {
-        return getRate(result)
-    }).then((result) => {
-        exchange = (`One USD equals ${result.rate} of CAD`);
+    //req.checkBody('name', 'Name is required').notEmpty();
+    // const errors = req.validationErrors();
+    // if(errors){
+    //     req.session.errors = errors;
+    //     res.redirect('/register');
+    // }else {
+    //     req.session.success = true;
+    // }
+
+    getPhoto(photo).then((result) => {
+        exchange = (`Image has a totla of ${result.type} hits`);
+        image = result.link
     }).catch((error) => {
         exchange = (`Error message: ${error}`);
     });
+    console.log("checking status" + " " + photo)
 
-    response.render('currency.hbs', {
-        title: 'Currency page',
-        head: 'Welcome to Currency Conversion',
-        result: exchange
+});
+
+var exchange = "";
+var image = "";
+
+app.get('/index', (request, response) => {
+
+    response.render('index.hbs', {
+        title: 'Index page',
+        head: 'Welcome I guess',
+        result: exchange,
+        photo: image
 
     });
 
@@ -119,11 +104,7 @@ app.get('/404', (request, response) => {
     })
 });
 
-/*
-app.listen(8080, () => {
-    console.log('Server is up on the port 8080')
-});
-*/
+
 app.listen(port, () => {
     console.log(`Server is up on the port ${port}`)
 });
